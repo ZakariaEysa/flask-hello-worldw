@@ -3,22 +3,15 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-
 app = Flask(__name__)
 
-# تحميل البيانات
-merged_data = pd.read_excel('movie.xlsx')
+# تحميل البيانات من CSV
+merged_data = pd.read_csv('movie.csv')
 
 # دمج الميزات للحصول على مرشح المحتوى
-merged_data['combined_features'] = (
-    merged_data['genres'] + ' ' +
-    merged_data['director_name'] + ' ' +
-    merged_data['actor_1_name'] + ' ' +
-    merged_data['actor_2_name'] + ' ' +
-    merged_data['actor_3_name']
-)
+merged_data['combined_features'] = merged_data[['genres', 'director_name', 'actor_1_name', 'actor_2_name', 'actor_3_name']].fillna('').agg(' '.join, axis=1)
 
-# تنظيف البيانات: إزالة الصفوف التي تحتوي على قيم NaN في العمود combined_features
+# تنظيف البيانات: إزالة الصفوف التي تحتوي على قيم فارغة في العمود combined_features
 merged_data.dropna(subset=['combined_features'], inplace=True)
 
 # إنشاء TF-IDF Vectorizer
@@ -35,8 +28,7 @@ def get_recommendations_by_description(description, num_recommendations=5):
 
     # الحصول على أعلى النتائج
     sim_scores = list(enumerate(cosine_sim[0]))
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    sim_scores = sim_scores[:num_recommendations]  # الحصول على أعلى التوصيات
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)[:num_recommendations]
 
     # الحصول على indices الأفلام الموصى بها
     movie_indices = [i[0] for i in sim_scores]
@@ -45,15 +37,12 @@ def get_recommendations_by_description(description, num_recommendations=5):
 # تعريف API endpoint
 @app.route('/recommend', methods=['POST'])
 def recommend():
-    # الحصول على الاسترينج المرسل في body الطلب
     data = request.json
-    description = data.get('query')  # المفتاح هنا هو "query"
+    description = data.get('query')
 
-    # إذا لم يتم إرسال استرينج، نعيد رسالة خطأ
     if not description:
         return jsonify({"error": "Please provide a query string."}), 400
 
-    # الحصول على التوصيات
     recommendations = get_recommendations_by_description(description)
     return jsonify(recommendations.to_dict(orient='records'))
 
